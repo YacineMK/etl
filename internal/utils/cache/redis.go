@@ -12,8 +12,6 @@ func New(ctx context.Context,cacheUri string) (*redis.Client, error) {
 		Password: "",
 		DB: 0,
 	})
-
-	defer rdb.Close()
 	
 	_ , err := rdb.Ping(ctx).Result()
 	if err != nil {
@@ -21,4 +19,6 @@ func New(ctx context.Context,cacheUri string) (*redis.Client, error) {
 	}
 	return rdb,nil
 }
+
+
 
