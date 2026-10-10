@@ -1,12 +1,16 @@
+
 package main
 
 import (
 	"context"
 	"log"
+	"sync"
+	"time"
 
 	"github.com/YacineMK/nasa-space-apps/internal/types"
 	"github.com/YacineMK/nasa-space-apps/internal/utils/cache"
 	"github.com/YacineMK/nasa-space-apps/internal/utils/streams"
+	"github.com/YacineMK/nasa-space-apps/internal/workers"
 )
 
 func main() {
@@ -14,26 +18,47 @@ func main() {
 
 	rdb, err := cache.New(ctx, "127.0.0.1:6379")
 	if err != nil {
-		log.Println("error:", err)
+		log.Fatal("Redis connection error: ", err)
 	}
-	log.Println("redis connected")
+	defer rdb.Close()
 
-	streamsList := []types.StreamConfig{
-		{
-			Subject:       "etl:jobs",
-			ConsumerGroup: "etl-processors",
-		},
-		{
-			Subject:       "etl:write-jobs",
-			ConsumerGroup: "postgres-writers",
-		},
-	}
-	
+	log.Println("Redis connected")
+
 	s := streams.New(rdb)
 	defer s.Close()
-	err = s.CreateStream(ctx, streamsList)
-	if err != nil {
-		panic(err)
+
+	if err := s.CreateStream(ctx, types.StreamsList); err != nil {
+		log.Fatal("Stream creation error: ", err)
 	}
-	log.Println("All streams have been created successfully")
+
+	log.Println("Streams created successfully")
+
+	wrk := workers.New(rdb)
+
+	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(2025, 1, 4, 0, 0, 0, 0, time.UTC)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		err := wrk.RangePlanerWorker(
+			ctx,
+			startDate,
+			endDate,
+			24*time.Hour,
+			36.7538, 
+			3.0588,  
+		)
+		if err != nil {
+			log.Println("RangePlanerWorker error:", err)
+			return
+		}
+
+		log.Println("RangePlanerWorker finished successfully")
+	}()
+
+	wg.Wait()
 }
