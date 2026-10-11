@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -33,7 +34,7 @@ func main() {
 
 	log.Println("Streams created successfully")
 
-	wrk := workers.New(rdb)
+	wrk := workers.New(rdb,"https://archive-api.open-meteo.com/v1/archive")
 
 	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(2025, 1, 4, 0, 0, 0, 0, time.UTC)
@@ -59,6 +60,19 @@ func main() {
 
 		log.Println("RangePlanerWorker finished successfully")
 	}()
+
+	const apiConsumers = 2
+	for i := 0; i < apiConsumers; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			name := fmt.Sprintf("api-consumer-%d", id)
+			if err := wrk.ApiConsumers(ctx, name); err != nil {
+				log.Printf("ApiConsumers[%s] stopped: %v", name, err)
+			}
+		}(i)
+	}
 
 	wg.Wait()
 }
