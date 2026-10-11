@@ -8,8 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/YacineMK/nasa-space-apps/internal/repository"
 	"github.com/YacineMK/nasa-space-apps/internal/types"
 	"github.com/YacineMK/nasa-space-apps/internal/utils/cache"
+	"github.com/YacineMK/nasa-space-apps/internal/utils/database"
 	"github.com/YacineMK/nasa-space-apps/internal/utils/streams"
 	"github.com/YacineMK/nasa-space-apps/internal/workers"
 )
@@ -25,6 +27,14 @@ func main() {
 
 	log.Println("Redis connected")
 
+	pool, err := database.New(ctx, "postgres://postgres:postgres@localhost:5432/nasa_space?sslmode=disable")
+	if err != nil {
+		log.Fatal("Postgres connection error: ", err)
+	}
+	defer pool.Close()
+
+	log.Println("Postgres connected")
+
 	s := streams.New(rdb)
 	defer s.Close()
 
@@ -34,7 +44,11 @@ func main() {
 
 	log.Println("Streams created successfully")
 
-	wrk := workers.New(rdb,"https://archive-api.open-meteo.com/v1/archive")
+	wrk := workers.New(
+		rdb,
+		"https://archive-api.open-meteo.com/v1/archive",
+		repository.New(pool),
+	)
 
 	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(2025, 1, 4, 0, 0, 0, 0, time.UTC)
@@ -61,7 +75,7 @@ func main() {
 		log.Println("RangePlanerWorker finished successfully")
 	}()
 
-	const apiConsumers = 2
+	const apiConsumers = 4
 	for i := 0; i < apiConsumers; i++ {
 		wg.Add(1)
 		go func(id int) {

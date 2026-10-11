@@ -8,8 +8,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/YacineMK/nasa-space-apps/internal/repository"
 	"github.com/YacineMK/nasa-space-apps/internal/types"
 	weatherhttp "github.com/YacineMK/nasa-space-apps/internal/utils/http"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -65,6 +67,12 @@ func (w *Workers) ApiConsumers(
 					continue
 				}
 
+				if err := w.persistWeather(ctx, *weather); err != nil {
+					log.Printf("[%s] Persist failed for message %s: %v",
+						consumerName, msg.ID, err)
+					continue
+				}
+
 				fmt.Printf(
 					"[%s] Fetched weather for (%f, %f): %d days\n",
 					consumerName,
@@ -89,4 +97,48 @@ func (w *Workers) ApiConsumers(
 			}
 		}
 	}
+}
+
+func (w *Workers) persistWeather(
+	ctx context.Context,
+	weather types.WeatherResponse,
+) error {
+	days := len(weather.Daily.Time)
+	if len(weather.Daily.Precipitation) != days ||
+		len(weather.Daily.TemperatureMax) != days ||
+		len(weather.Daily.TemperatureMin) != days ||
+		len(weather.Daily.Evapotranspiration) != days {
+		return fmt.Errorf("daily arrays length mismatch")
+	}
+
+	for i := 0; i < days; i++ {
+		date, err := time.Parse("2006-01-02", weather.Daily.Time[i])
+		if err != nil {
+			return fmt.Errorf("parse day %q: %w", weather.Daily.Time[i], err)
+		}
+
+		params := repository.InsertWeatherDailyParams{
+			Latitude:                 weather.Latitude,
+			Longitude:                weather.Longitude,
+			Date:                     pgtype.Date{Time: date, Valid: true},
+			Timezone:                 weather.Timezone,
+			PrecipitationSum:         nullFloat(weather.Daily.Precipitation[i]),
+			Temperature2mMax:         nullFloat(weather.Daily.TemperatureMax[i]),
+			Temperature2mMin:         nullFloat(weather.Daily.TemperatureMin[i]),
+			Et0FaoEvapotranspiration: nullFloat(weather.Daily.Evapotranspiration[i]),
+		}
+
+		if err := w.repo.InsertWeatherDaily(ctx, params); err != nil {
+			return fmt.Errorf("insert %s: %w", weather.Daily.Time[i], err)
+		}
+	}
+
+	return nil
+}
+
+func nullFloat(value *float64) pgtype.Float8 {
+	if value == nil {
+		return pgtype.Float8{}
+	}
+	return pgtype.Float8{Float64: *value, Valid: true}
 }
