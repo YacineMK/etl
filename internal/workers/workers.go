@@ -6,8 +6,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const requestsPerSecond = 8
-
 type Workers struct {
 	rdb     *redis.Client
 	Uri     string
@@ -15,7 +13,7 @@ type Workers struct {
 	limiter *rate.Limiter
 }
 
-func New(rdb *redis.Client, uri string, repo *repository.Queries) *Workers {
+func New(rdb *redis.Client, uri string, repo *repository.Queries, requestsPerSecond int) *Workers {
 	return &Workers{
 		rdb:     rdb,
 		Uri:     uri,

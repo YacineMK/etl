@@ -17,6 +17,19 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+
+  pipeline:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      REDIS_ADDR: redis:6379
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/nasa_space?sslmode=disable
+      WEATHER_URI: https://archive-api.open-meteo.com/v1/archive
+      REQUESTS_PER_SECOND: 8
 
 volumes:
   pgdata:

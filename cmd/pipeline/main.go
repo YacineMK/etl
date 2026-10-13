@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/YacineMK/etl/internal/config"
 	"github.com/YacineMK/etl/internal/repository"
 	"github.com/YacineMK/etl/internal/types"
 	"github.com/YacineMK/etl/internal/utils/cache"
@@ -19,7 +20,9 @@ import (
 func main() {
 	ctx := context.Background()
 
-	rdb, err := cache.New(ctx, "127.0.0.1:6379")
+	cfg := config.Load()
+
+	rdb, err := cache.New(ctx, cfg.RedisAddr)
 	if err != nil {
 		log.Fatal("Redis connection error: ", err)
 	}
@@ -27,7 +30,7 @@ func main() {
 
 	log.Println("Redis connected")
 
-	pool, err := database.New(ctx, "postgres://postgres:postgres@localhost:5432/nasa_space?sslmode=disable")
+	pool, err := database.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatal("Postgres connection error: ", err)
 	}
@@ -46,8 +49,9 @@ func main() {
 
 	wrk := workers.New(
 		rdb,
-		"https://archive-api.open-meteo.com/v1/archive",
+		cfg.WeatherURI,
 		repository.New(pool),
+		cfg.RequestsPerSecond,
 	)
 
 	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
