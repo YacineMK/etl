@@ -8,10 +8,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/YacineMK/nasa-space-apps/internal/repository"
-	"github.com/YacineMK/nasa-space-apps/internal/types"
-	weatherhttp "github.com/YacineMK/nasa-space-apps/internal/utils/http"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/YacineMK/etl/internal/types"
+	weatherhttp "github.com/YacineMK/etl/internal/utils/http"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -67,8 +65,8 @@ func (w *Workers) ApiConsumers(
 					continue
 				}
 
-				if err := w.persistWeather(ctx, *weather); err != nil {
-					log.Printf("[%s] Persist failed for message %s: %v",
+				if err := w.publishWriteEvents(ctx, *weather); err != nil {
+					log.Printf("[%s] Publish failed for message %s: %v",
 						consumerName, msg.ID, err)
 					continue
 				}
@@ -99,7 +97,7 @@ func (w *Workers) ApiConsumers(
 	}
 }
 
-func (w *Workers) persistWeather(
+func (w *Workers) publishWriteEvents(
 	ctx context.Context,
 	weather types.WeatherResponse,
 ) error {
@@ -111,34 +109,33 @@ func (w *Workers) persistWeather(
 		return fmt.Errorf("daily arrays length mismatch")
 	}
 
+	stream := types.StreamsList[1].Subject
 	for i := 0; i < days; i++ {
-		date, err := time.Parse("2006-01-02", weather.Daily.Time[i])
-		if err != nil {
-			return fmt.Errorf("parse day %q: %w", weather.Daily.Time[i], err)
-		}
-
-		params := repository.InsertWeatherDailyParams{
+		record := types.WeatherRecord{
 			Latitude:                 weather.Latitude,
 			Longitude:                weather.Longitude,
-			Date:                     pgtype.Date{Time: date, Valid: true},
+			Date:                     weather.Daily.Time[i],
 			Timezone:                 weather.Timezone,
-			PrecipitationSum:         nullFloat(weather.Daily.Precipitation[i]),
-			Temperature2mMax:         nullFloat(weather.Daily.TemperatureMax[i]),
-			Temperature2mMin:         nullFloat(weather.Daily.TemperatureMin[i]),
-			Et0FaoEvapotranspiration: nullFloat(weather.Daily.Evapotranspiration[i]),
+			PrecipitationSum:         weather.Daily.Precipitation[i],
+			Temperature2mMax:         weather.Daily.TemperatureMax[i],
+			Temperature2mMin:         weather.Daily.TemperatureMin[i],
+			Et0FaoEvapotranspiration: weather.Daily.Evapotranspiration[i],
 		}
 
-		if err := w.repo.InsertWeatherDaily(ctx, params); err != nil {
-			return fmt.Errorf("insert %s: %w", weather.Daily.Time[i], err)
+		payload, err := json.Marshal(record)
+		if err != nil {
+			return fmt.Errorf("marshal record %s: %w", record.Date, err)
+		}
+
+		if _, err := w.rdb.XAdd(ctx, &redis.XAddArgs{
+			Stream: stream,
+			Values: map[string]interface{}{
+				"payload": string(payload),
+			},
+		}).Result(); err != nil {
+			return fmt.Errorf("publish record %s: %w", record.Date, err)
 		}
 	}
 
 	return nil
-}
-
-func nullFloat(value *float64) pgtype.Float8 {
-	if value == nil {
-		return pgtype.Float8{}
-	}
-	return pgtype.Float8{Float64: *value, Valid: true}
 }

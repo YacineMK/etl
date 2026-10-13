@@ -6,26 +6,10 @@
 package repository
 
 import (
-	"context"
-
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const insertWeatherDaily = `-- name: InsertWeatherDaily :exec
-INSERT INTO weather_daily (
-    latitude, longitude, date, timezone,
-    precipitation_sum, temperature_2m_max, temperature_2m_min,
-    et0_fao_evapotranspiration
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-ON CONFLICT (latitude, longitude, date) DO UPDATE SET
-    timezone = EXCLUDED.timezone,
-    precipitation_sum = EXCLUDED.precipitation_sum,
-    temperature_2m_max = EXCLUDED.temperature_2m_max,
-    temperature_2m_min = EXCLUDED.temperature_2m_min,
-    et0_fao_evapotranspiration = EXCLUDED.et0_fao_evapotranspiration
-`
-
-type InsertWeatherDailyParams struct {
+type CopyWeatherDailyParams struct {
 	Latitude                 float64
 	Longitude                float64
 	Date                     pgtype.Date
@@ -34,18 +18,4 @@ type InsertWeatherDailyParams struct {
 	Temperature2mMax         pgtype.Float8
 	Temperature2mMin         pgtype.Float8
 	Et0FaoEvapotranspiration pgtype.Float8
-}
-
-func (q *Queries) InsertWeatherDaily(ctx context.Context, arg InsertWeatherDailyParams) error {
-	_, err := q.db.Exec(ctx, insertWeatherDaily,
-		arg.Latitude,
-		arg.Longitude,
-		arg.Date,
-		arg.Timezone,
-		arg.PrecipitationSum,
-		arg.Temperature2mMax,
-		arg.Temperature2mMin,
-		arg.Et0FaoEvapotranspiration,
-	)
-	return err
 }

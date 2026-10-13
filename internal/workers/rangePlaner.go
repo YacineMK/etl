@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/YacineMK/nasa-space-apps/internal/types"
+	"github.com/YacineMK/etl/internal/types"
 	"github.com/redis/go-redis/v9"
 )
 

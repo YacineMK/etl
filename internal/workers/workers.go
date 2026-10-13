@@ -1,7 +1,7 @@
 package workers
 
 import (
-	"github.com/YacineMK/nasa-space-apps/internal/repository"
+	"github.com/YacineMK/etl/internal/repository"
 	"github.com/redis/go-redis/v9"
 )
 

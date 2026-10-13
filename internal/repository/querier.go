@@ -9,7 +9,7 @@ import (
 )
 
 type Querier interface {
-	InsertWeatherDaily(ctx context.Context, arg InsertWeatherDailyParams) error
+	CopyWeatherDaily(ctx context.Context, arg []CopyWeatherDailyParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -1,4 +1,4 @@
-module github.com/YacineMK/nasa-space-apps
+module github.com/YacineMK/etl
 
 go 1.26.4
 

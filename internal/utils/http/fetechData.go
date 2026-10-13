@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/YacineMK/nasa-space-apps/internal/types"
+	"github.com/YacineMK/etl/internal/types"
 )
 
 

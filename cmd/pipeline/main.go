@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/YacineMK/nasa-space-apps/internal/repository"
-	"github.com/YacineMK/nasa-space-apps/internal/types"
-	"github.com/YacineMK/nasa-space-apps/internal/utils/cache"
-	"github.com/YacineMK/nasa-space-apps/internal/utils/database"
-	"github.com/YacineMK/nasa-space-apps/internal/utils/streams"
-	"github.com/YacineMK/nasa-space-apps/internal/workers"
+	"github.com/YacineMK/etl/internal/repository"
+	"github.com/YacineMK/etl/internal/types"
+	"github.com/YacineMK/etl/internal/utils/cache"
+	"github.com/YacineMK/etl/internal/utils/database"
+	"github.com/YacineMK/etl/internal/utils/streams"
+	"github.com/YacineMK/etl/internal/workers"
 )
 
 func main() {
@@ -63,7 +63,7 @@ func main() {
 			ctx,
 			startDate,
 			endDate,
-			24*time.Hour,
+			7*24*time.Hour,
 			36.7538, 
 			3.0588,  
 		)
@@ -84,6 +84,19 @@ func main() {
 			name := fmt.Sprintf("api-consumer-%d", id)
 			if err := wrk.ApiConsumers(ctx, name); err != nil {
 				log.Printf("ApiConsumers[%s] stopped: %v", name, err)
+			}
+		}(i)
+	}
+
+	const pgWriters = 4
+	for i := 0; i < pgWriters; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			name := fmt.Sprintf("pg-writer-%d", id)
+			if err := wrk.PostgresWriter(ctx, name, 20); err != nil {
+				log.Printf("PostgresWriter[%s] stopped: %v", name, err)
 			}
 		}(i)
 	}
