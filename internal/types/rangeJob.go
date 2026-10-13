@@ -5,4 +5,5 @@ type RangeJob struct {
 	EndDate   string  `json:"end_date"`
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
+	Attempt   int     `json:"attempt,omitempty"`
 }

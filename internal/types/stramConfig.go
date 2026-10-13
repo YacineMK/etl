@@ -14,4 +14,12 @@ var StreamsList = []StreamConfig{
 		Subject:       "etl:write-jobs",
 		ConsumerGroup: "postgres-writers",
 	},
+	{
+		Subject:       "etl:retry",
+		ConsumerGroup: "retry-processors",
+	},
+	{
+		Subject:       "etl:dlq",
+		ConsumerGroup: "dlq-processors",
+	},
 }

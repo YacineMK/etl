@@ -49,25 +49,33 @@ func (w *Workers) ApiConsumers(
 				payload, ok := msg.Values["payload"].(string)
 				if !ok {
 					log.Printf("Message %s has invalid payload", msg.ID)
+					w.deadLetter(ctx, stream, msg.ID, "", "invalid payload")
 					continue
 				}
 
 				var job types.RangeJob
 				if err := json.Unmarshal([]byte(payload), &job); err != nil {
 					log.Printf("Decode message %s: %v", msg.ID, err)
+					w.deadLetter(ctx, stream, msg.ID, payload, err.Error())
 					continue
+				}
+
+				if err := w.limiter.Wait(ctx); err != nil {
+					return err
 				}
 
 				weather, err := weatherhttp.FetchWeather(ctx, w.Uri, job)
 				if err != nil {
 					log.Printf("[%s] Fetch failed for message %s: %v",
 						consumerName, msg.ID, err)
+					w.requeue(ctx, stream, msg.ID, job, err)
 					continue
 				}
 
 				if err := w.publishWriteEvents(ctx, *weather); err != nil {
 					log.Printf("[%s] Publish failed for message %s: %v",
 						consumerName, msg.ID, err)
+					w.requeue(ctx, stream, msg.ID, job, err)
 					continue
 				}
 
@@ -79,16 +87,7 @@ func (w *Workers) ApiConsumers(
 					len(weather.Daily.Time),
 				)
 
-				if err := w.rdb.XAck(
-					ctx,
-					stream.Subject,
-					stream.ConsumerGroup,
-					msg.ID,
-				).Err(); err != nil {
-					log.Printf("Acknowledge message %s failed: %v",
-						msg.ID, err)
-					continue
-				}
+				w.ack(ctx, stream, msg.ID)
 
 				log.Printf("[%s] Processed message %s",
 					consumerName, msg.ID)

@@ -101,5 +101,14 @@ func main() {
 		}(i)
 	}
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		if err := wrk.RetryWorker(ctx); err != nil {
+			log.Printf("RetryWorker stopped: %v", err)
+		}
+	}()
+
 	wg.Wait()
 }
